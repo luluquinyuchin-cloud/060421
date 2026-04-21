@@ -1,7 +1,7 @@
 let capture;
 let pg; // 宣告繪圖圖層
 let videoBuffer; // 專門用來處理濾鏡的圖層
-let saveBtn, filterBtn; // 儲存與濾鏡按鈕
+let saveBtn, filterBtn, decoBtn; // 儲存、濾鏡與裝飾按鈕
 let bubbles = []; // 儲存泡泡物件的陣列
 
 let vW, vH; // 用於儲存計算後的等比例寬高
@@ -9,6 +9,10 @@ let vW, vH; // 用於儲存計算後的等比例寬高
 // 濾鏡相關變數
 let filterIndex = 0;
 const filterNames = ['原始', '黑白', '馬賽模糊'];
+
+// 裝飾相關變數
+let decoIndex = 0;
+const decoNames = ['無', '🎀 蝴蝶結', '❤️ 愛心', '✨ 邊框'];
 
 class Bubble {
   constructor(w, h) {
@@ -58,6 +62,9 @@ function setup() {
 
   filterBtn = createButton('✨ 切換濾鏡: 原始');
   filterBtn.mousePressed(nextFilter);
+
+  decoBtn = createButton('🎀 裝飾: 無');
+  decoBtn.mousePressed(nextDeco);
 
   positionButton();
 }
@@ -122,11 +129,19 @@ function draw() {
     if (bubbles[i].y < -20) bubbles.splice(i, 1);
   }
 
-  pg.fill(255);
+  // 繪製裝飾特效
+  drawDecoration(pg);
+
+  // 繪製濾鏡文字排版 (移至左上角)
+  pg.push();
   pg.noStroke();
-  pg.textSize(24);
-  pg.textAlign(CENTER, CENTER);
-  pg.text("Filter: " + filterNames[filterIndex], pg.width / 2, pg.height / 2);
+  pg.fill(0, 100); // 半透明深色背景
+  pg.rect(0, 0, 140, 35, 0, 0, 10, 0); // 文字底框
+  pg.fill(255);
+  pg.textSize(16);
+  pg.textAlign(LEFT, CENTER);
+  pg.text("✨ " + filterNames[filterIndex], 15, 18);
+  pg.pop();
 
   // 8. 將 pg 圖層顯示在視訊畫面的上方
   image(pg, x, y);
@@ -142,17 +157,71 @@ function nextFilter() {
   filterBtn.html('✨ 切換濾鏡: ' + filterNames[filterIndex]);
 }
 
+function nextDeco() {
+  decoIndex = (decoIndex + 1) % decoNames.length;
+  decoBtn.html('🎀 裝飾: ' + decoNames[decoIndex]);
+}
+
+function drawDecoration(g) {
+  if (decoIndex === 1) { // 蝴蝶結
+    g.push();
+    g.translate(g.width - 60, g.height - 50); // 移至右下角
+    g.fill(255, 100, 150); // 粉紅色
+    g.noStroke();
+    // 左右兩邊三角形
+    g.triangle(0, 0, -40, -25, -40, 25);
+    g.triangle(0, 0, 50, -30, 50, 30);
+    // 中間圓結
+    g.fill(255, 150, 180);
+    g.ellipse(0, 0, 25, 25);
+    g.pop();
+  } else if (decoIndex === 2) { // 愛心
+    g.push();
+    g.translate(g.width - 60, 60); // 移至右上角
+    g.fill(255, 50, 50, 200); // 半透明紅色
+    g.noStroke();
+    g.beginShape();
+    for (let a = 0; a < TWO_PI; a += 0.1) {
+      let r = 3; // 愛心縮小一點，當作點綴
+      let dx = r * 16 * pow(sin(a), 3);
+      let dy = -r * (13 * cos(a) - 5 * cos(2 * a) - 2 * cos(3 * a) - cos(4 * a));
+      g.vertex(dx, dy);
+    }
+    g.endShape(CLOSE);
+    g.pop();
+  } else if (decoIndex === 3) { // 邊框裝飾
+    g.push();
+    g.stroke(255, 200, 200, 200); // 淺粉色半透明線條
+    g.strokeWeight(4);
+    g.noFill();
+    let len = 30; // 邊框轉角長度
+    let p = 15;   // 離邊緣的間距
+    // 左上角
+    g.line(p, p, p + len, p);
+    g.line(p, p, p, p + len);
+    // 右上角
+    g.line(g.width - p, p, g.width - p - len, p);
+    g.line(g.width - p, p, g.width - p, p + len);
+    // 左下角
+    g.line(p, g.height - p, p + len, g.height - p);
+    g.line(p, g.height - p, p, g.height - p - len);
+    // 右下角
+    g.line(g.width - p, g.height - p, g.width - p - len, g.height - p);
+    g.line(g.width - p, g.height - p, g.width - p, g.height - p - len);
+    g.pop();
+  }
+}
+
 function applySelectedFilter(buffer) {
   if (filterIndex === 1) buffer.filter(GRAY);
   else if (filterIndex === 2) buffer.filter(BLUR, 8);
 }
 
 function positionButton(x, y, vW, vH) {
-  // 計算按鈕位置，並排放在視訊畫面下方 20px 處
-  let btnY = y + vH + 20;
-  let centerX = width / 2;
-  saveBtn.position(centerX - saveBtn.width - 10, btnY);
-  filterBtn.position(centerX + 10, btnY);
+  let btnY = y + vH + 25;
+  saveBtn.position(width / 2 - 180, btnY);
+  filterBtn.position(width / 2 - 60, btnY);
+  decoBtn.position(width / 2 + 100, btnY);
 }
 
 function saveScreenshot() {
