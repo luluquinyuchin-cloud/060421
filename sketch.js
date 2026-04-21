@@ -1,9 +1,14 @@
 let capture;
 let pg; // 宣告繪圖圖層
-let saveBtn; // 儲存按鈕
+let videoBuffer; // 專門用來處理濾鏡的圖層
+let saveBtn, filterBtn; // 儲存與濾鏡按鈕
 let bubbles = []; // 儲存泡泡物件的陣列
 
 let vW, vH; // 用於儲存計算後的等比例寬高
+
+// 濾鏡相關變數
+let filterIndex = 0;
+const filterNames = ['原始', '黑白', '反相', '高對比', '色調分離', '磨砂'];
 
 class Bubble {
   constructor(w, h) {
@@ -45,10 +50,15 @@ function setup() {
 
   // 創建一個與視訊顯示大小相同的圖層
   pg = createGraphics(100, 100); // 初始大小，draw 中會重新調整
+  videoBuffer = createGraphics(100, 100);
 
   // 創建按鈕並設定位置與事件處理
-  saveBtn = createButton('擷取圖片');
+  saveBtn = createButton('📸 拍照');
   saveBtn.mousePressed(saveScreenshot);
+
+  filterBtn = createButton('✨ 切換濾鏡: 原始');
+  filterBtn.mousePressed(nextFilter);
+
   positionButton();
 }
 
@@ -76,18 +86,25 @@ function draw() {
   // 同步調整 pg 圖層大小以符合比例
   if (pg.width !== floor(vW) || pg.height !== floor(vH)) {
     pg.resizeCanvas(vW, vH);
+    videoBuffer.resizeCanvas(vW, vH);
   }
 
   // 5. 計算置中的座標位置
   let x = (width - vW) / 2;
   let y = (height - vH) / 2;
 
-  // 6. 將影像繪製在畫布中間 (並修正左右顛倒/鏡像問題)
-  push(); // 儲存目前的繪圖設定
-  translate(x + vW, y); // 將原點移至影像顯示區域的右上角
-  scale(-1, 1); // 水平翻轉座標系
-  image(capture, 0, 0, vW, vH); // 繪製影像，此時 0,0 會對應到翻轉後的座標
-  pop(); // 恢復先前的繪圖設定，避免影響後續的繪圖
+  // 6. 處理視訊影像與濾鏡
+  videoBuffer.push();
+  videoBuffer.translate(vW, 0);
+  videoBuffer.scale(-1, 1);
+  videoBuffer.image(capture, 0, 0, vW, vH);
+  videoBuffer.pop();
+
+  // 根據選擇套用濾鏡
+  applySelectedFilter(videoBuffer);
+
+  // 將處理好的視訊繪製到主畫布
+  image(videoBuffer, x, y);
 
   // 7. 在 pg 圖層上繪製內容 (例如：文字或邊框)
   pg.clear(); // 清除上一影格的內容，保持背景透明
@@ -109,7 +126,7 @@ function draw() {
   pg.noStroke();
   pg.textSize(24);
   pg.textAlign(CENTER, CENTER);
-  pg.text("Overlay Content", pg.width / 2, pg.height / 2);
+  pg.text("Filter: " + filterNames[filterIndex], pg.width / 2, pg.height / 2);
 
   // 8. 將 pg 圖層顯示在視訊畫面的上方
   image(pg, x, y);
