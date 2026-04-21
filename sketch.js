@@ -3,23 +3,34 @@ let pg; // 宣告繪圖圖層
 let saveBtn; // 儲存按鈕
 let bubbles = []; // 儲存泡泡物件的陣列
 
+let vW, vH; // 用於儲存計算後的等比例寬高
+
 class Bubble {
   constructor(w, h) {
     this.x = random(w);
     this.y = h + random(10, 50); // 從畫面下方外側生成
     this.r = random(5, 15);      // 隨機半徑
-    this.speed = random(1, 3);   // 往上飄的速度
+    this.speed = random(0.8, 2.5); // 往上飄的速度
+    this.noiseOffset = random(1000); // 用於產生更自然的擺動
+    this.alpha = random(50, 150);    // 隨機透明度
   }
 
   move() {
     this.y -= this.speed; // 向上移動
-    this.x += sin(frameCount * 0.1 + this.y) * 0.5; // 稍微左右晃動
+    // 使用 noise 讓水平擺動更絲滑
+    this.x += (noise(this.noiseOffset + frameCount * 0.02) - 0.5) * 2;
   }
 
   display(g) {
-    g.stroke(255, 150);
-    g.fill(255, 80);
+    g.push();
+    g.noStroke();
+    // 泡泡主體
+    g.fill(255, this.alpha * 0.5);
     g.circle(this.x, this.y, this.r * 2);
+    // 增加一個白色高光點，讓泡泡有立體感
+    g.fill(255, this.alpha);
+    g.circle(this.x - this.r * 0.3, this.y - this.r * 0.3, this.r * 0.4);
+    g.pop();
   }
 }
 
@@ -33,7 +44,7 @@ function setup() {
   capture.hide();
 
   // 創建一個與視訊顯示大小相同的圖層
-  pg = createGraphics(width * 0.6, height * 0.6);
+  pg = createGraphics(100, 100); // 初始大小，draw 中會重新調整
 
   // 創建按鈕並設定位置與事件處理
   saveBtn = createButton('擷取圖片');
@@ -45,19 +56,37 @@ function draw() {
   // 3. 設定背景顏色為 e7c6ff
   background('#8d99ae');
 
-  // 4. 計算顯示影像的寬高 (整個畫布寬高的 60%)
-  let videoW = width * 0.6;
-  let videoH = height * 0.6;
+  // 4. 計算等比例顯示影像的寬高 (限制在畫布寬高的 60% 內)
+  let maxWidth = width * 0.6;
+  let maxHeight = height * 0.6;
+  
+  if (capture.width > 0) {
+    let aspect = capture.width / capture.height;
+    vW = maxWidth;
+    vH = vW / aspect;
+    if (vH > maxHeight) {
+      vH = maxHeight;
+      vW = vH * aspect;
+    }
+  } else {
+    vW = maxWidth;
+    vH = maxHeight;
+  }
+
+  // 同步調整 pg 圖層大小以符合比例
+  if (pg.width !== floor(vW) || pg.height !== floor(vH)) {
+    pg.resizeCanvas(vW, vH);
+  }
 
   // 5. 計算置中的座標位置
-  let x = (width - videoW) / 2;
-  let y = (height - videoH) / 2;
+  let x = (width - vW) / 2;
+  let y = (height - vH) / 2;
 
   // 6. 將影像繪製在畫布中間 (並修正左右顛倒/鏡像問題)
   push(); // 儲存目前的繪圖設定
-  translate(x + videoW, y); // 將原點移至影像顯示區域的右上角
+  translate(x + vW, y); // 將原點移至影像顯示區域的右上角
   scale(-1, 1); // 水平翻轉座標系
-  image(capture, 0, 0, videoW, videoH); // 繪製影像，此時 0,0 會對應到翻轉後的座標
+  image(capture, 0, 0, vW, vH); // 繪製影像，此時 0,0 會對應到翻轉後的座標
   pop(); // 恢復先前的繪圖設定，避免影響後續的繪圖
 
   // 7. 在 pg 圖層上繪製內容 (例如：文字或邊框)
@@ -84,32 +113,26 @@ function draw() {
 
   // 8. 將 pg 圖層顯示在視訊畫面的上方
   image(pg, x, y);
+
+  // 確保按鈕位置正確
+  positionButton(x, y, vW, vH);
 }
 
-function positionButton() {
+function positionButton(x, y, vW, vH) {
   // 計算按鈕位置，放在視訊畫面正下方 10px 處
-  let videoH = height * 0.6;
-  let y = (height - videoH) / 2;
-  saveBtn.position(width / 2 - saveBtn.width / 2, y + videoH + 10);
+  saveBtn.position(width / 2 - saveBtn.width / 2, y + vH + 10);
 }
 
 function saveScreenshot() {
-  // 重新計算目前的視訊範圍
-  let videoW = width * 0.6;
-  let videoH = height * 0.6;
-  let x = (width - videoW) / 2;
-  let y = (height - videoH) / 2;
+  let x = (width - vW) / 2;
+  let y = (height - vH) / 2;
   
   // 從畫布擷取該區域
-  let img = get(x, y, videoW, videoH);
+  let img = get(x, y, vW, vH);
   save(img, 'screenshot.jpg');
 }
 
 function windowResized() {
   // 當視窗大小改變時，重新調整畫布大小
   resizeCanvas(windowWidth, windowHeight);
-  // 同步調整圖層大小
-  pg.resizeCanvas(width * 0.6, height * 0.6);
-  // 同步調整按鈕位置
-  positionButton();
 }
