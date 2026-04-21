@@ -8,7 +8,7 @@ let vW, vH; // 用於儲存計算後的等比例寬高
 
 // 濾鏡相關變數
 let filterIndex = 0;
-const filterNames = ['原始', '黑白', '反相', '高對比', '色調分離', '磨砂'];
+const filterNames = ['原始', '黑白', '馬賽模糊'];
 
 class Bubble {
   constructor(w, h) {
@@ -131,19 +131,33 @@ function draw() {
   // 8. 將 pg 圖層顯示在視訊畫面的上方
   image(pg, x, y);
 
-  // 確保按鈕位置正確
-  positionButton(x, y, vW, vH);
+  // 9. 確保按鈕位置正確 (只有在尺寸計算出來後才移動)
+  if (vW > 0) {
+    positionButton(x, y, vW, vH);
+  }
+}
+
+function nextFilter() {
+  filterIndex = (filterIndex + 1) % filterNames.length;
+  filterBtn.html('✨ 切換濾鏡: ' + filterNames[filterIndex]);
+}
+
+function applySelectedFilter(buffer) {
+  if (filterIndex === 1) buffer.filter(GRAY);
+  else if (filterIndex === 2) buffer.filter(BLUR, 8);
 }
 
 function positionButton(x, y, vW, vH) {
-  // 計算按鈕位置，放在視訊畫面正下方 10px 處
-  saveBtn.position(width / 2 - saveBtn.width / 2, y + vH + 10);
+  // 計算按鈕位置，並排放在視訊畫面下方 20px 處
+  let btnY = y + vH + 20;
+  let centerX = width / 2;
+  saveBtn.position(centerX - saveBtn.width - 10, btnY);
+  filterBtn.position(centerX + 10, btnY);
 }
 
 function saveScreenshot() {
   let x = (width - vW) / 2;
   let y = (height - vH) / 2;
-  
   // 從畫布擷取該區域
   let img = get(x, y, vW, vH);
   save(img, 'screenshot.jpg');
